@@ -3,10 +3,24 @@
 {% block content %}
     <h6>UPLOAD MULTIPLE IMAGES NOW</h6>
     <br>
-    <form enctype='multipart/form-data' action="upload/" method='POST' class="dropzone dz" id="my-dropzone">
+    <form action="/target" class="dropzone" id="my-great-dropzone">
         {% csrf_token %}
-        <div class="fallback">
-            <input name="file" type="file" multiple/>
-        </div>
     </form>
+
+    <script>
+        const dropzoneConfig = JSON.parse('{{ dropzone_config|safe }}');
+        Dropzone.options.myGreatDropzone = {
+            url: dropzoneConfig.url,
+            method: dropzoneConfig.method,
+            chunking: dropzoneConfig.chunking,
+            forceChunking: dropzoneConfig.forceChunking,
+            chunkSize: dropzoneConfig.chunkSize,
+            retryChunks: dropzoneConfig.retryChunks,
+            retryChunksLimit: dropzoneConfig.retryChunksLimit,
+            maxFilesize: dropzoneConfig.maxFilesize,
+            paramName: dropzoneConfig.paramName,
+            maxFiles: dropzoneConfig.maxFiles,
+            acceptedFiles: dropzoneConfig.acceptedFiles,
+        };
+    </script>
 {% endblock %}

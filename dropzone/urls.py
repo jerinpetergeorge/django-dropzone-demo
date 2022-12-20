@@ -3,6 +3,6 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path("", views.Index.as_view()),
-    path("upload/", views.file_upload),
+    path("", views.DropzoneRenderView.as_view()),
+    path("upload/", views.DropzoneUploadView.as_view(), name="upload"),
 ]
