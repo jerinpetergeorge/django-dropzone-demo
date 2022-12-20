@@ -10,7 +10,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("allauth.urls")),
     path("api/", include((api_urlpatterns, "api_apps"), namespace="api")),
-    path("", include("pages.urls")),
+    # path("", include("pages.urls")),
+    path("", include("dropzone.urls")),
 ]
 
 if settings.DEBUG:

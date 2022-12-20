@@ -51,6 +51,7 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     "accounts",
     "pages",
+    "dropzone",
 ]
 INSTALLED_APPS = [
     *BUILTIN_APPS,
