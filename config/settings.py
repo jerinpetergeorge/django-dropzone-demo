@@ -195,3 +195,9 @@ REST_FRAMEWORK = {
 DEV_EMAIL = env("DEV_EMAIL")
 DEV_PASSWORD = env("DEV_PASSWORD")
 DEV_FULL_NAME = env("DEV_FULL_NAME")
+
+DROPZONE_CONFIG = {
+    "JS_OPTIONS": {
+        "maxFiles": 3,
+    },
+}
