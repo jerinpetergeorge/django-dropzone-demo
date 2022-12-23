@@ -6,6 +6,7 @@ from django.urls import reverse_lazy
 from django.views import generic
 
 from .conf import settings as dz_settings
+from .models import Session
 
 
 class UploadAttrMixin:
@@ -77,4 +78,23 @@ class DropzoneUploadAbstractView(generic.View):
 
 
 class DropzoneUploadView(DropzoneUploadAbstractView):
-    ...
+    def get_or_create_session(self, uuid, total_size, total_chunks, chunk_size):
+        session, created = Session.objects.get_or_create(
+            uuid=uuid,
+            defaults={
+                "total_size": total_size,
+                "total_chunks": total_chunks,
+                "chunk_size": chunk_size,
+            },
+        )
+        return session
+
+    def process_file(self, file, *args, **kwargs):
+        payload = self.request.POST
+        uuid = payload["dzuuid"]
+        chunk_index = payload["dzchunkindex"]
+        total_size = payload["dztotalfilesize"]
+        chunk_size = payload["dzchunksize"]
+        total_chunks = payload["dztotalchunkcount"]
+        session = self.get_or_create_session(uuid, total_size, total_chunks, chunk_size)
+        session.create_chunk(file, index=chunk_index)
