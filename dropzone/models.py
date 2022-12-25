@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from django.db import models
 
+from .conf import settings as dz_settings
 from .utils import sizeof_fmt
 
 
@@ -8,6 +11,7 @@ class Session(models.Model):
     total_size = models.IntegerField()
     total_chunks = models.IntegerField()
     chunk_size = models.IntegerField()
+    file_name = models.CharField(max_length=255)
 
     def __str__(self):
         return str(self.uuid)
@@ -32,16 +36,33 @@ class Session(models.Model):
         return self.chunks.count() == self.total_chunks
 
     def merge_chunks(self, **kwargs):
-        for chunk in self.chunks.all():
-            # do some magic here
-            pass
+        if not self.is_complete:
+            raise ValueError("Chunks are not complete")
+
+        Path(dz_settings.FILE_PROCESSING_DIR).mkdir(
+            # create the directory if it doesn't exist
+            exist_ok=True,
+            parents=True,
+        )
+
+        # Since we are using the UUID to create the file name, we can be
+        # sure that the file name is unique and thus appending to this
+        # newly created file will give us the merged file.
+        file_path = dz_settings.FILE_PROCESSING_DIR / f"{self.uuid}-{self.file_name}"
+        file_stream = open(file_path, "ab")
+
+        for chunk in self.chunks.order_by("index"):
+            file_stream.write(chunk.file.read())
 
 
 class ChunkedFile(models.Model):
     SEP = "___"
 
     def chunk_upload_path(self, filename):
-        return f"dropzone/{self.session.uuid}/{self.index}{self.SEP}{filename}"
+        return (
+            f"{dz_settings.FILE_UPLOAD_DIR}/{self.session.uuid}"
+            f"/{self.index}{self.SEP}{filename}"
+        )
 
     session = models.ForeignKey(
         Session,
