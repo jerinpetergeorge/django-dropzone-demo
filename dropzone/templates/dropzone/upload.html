@@ -21,6 +21,23 @@
             paramName: dropzoneConfig.paramName,
             maxFiles: dropzoneConfig.maxFiles,
             acceptedFiles: dropzoneConfig.acceptedFiles,
+            chunksUploaded: function (file, done) {
+                // Send HTTP POST request to upstream to merge chunks.
+                $.ajax(
+                    {
+                        url: dropzoneConfig.mergeURL,
+                        type: 'POST',
+                        data: {
+                            dzuuid: file.upload.uuid,
+                            csrfmiddlewaretoken: '{{ csrf_token }}'
+                        },
+                        success: function (data) {
+                            done();
+                        }
+                    }
+                );
+                done();
+            },
         };
     </script>
 {% endblock %}

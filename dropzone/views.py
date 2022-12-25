@@ -2,7 +2,8 @@ import json
 from functools import cached_property
 
 from django.http import JsonResponse
-from django.urls import reverse_lazy
+from django.shortcuts import get_object_or_404
+from django.urls import reverse, reverse_lazy
 from django.views import generic
 
 from .conf import settings as dz_settings
@@ -56,6 +57,7 @@ class DropzoneChunkedUploadView(DropzoneAbstractRenderView):
             "chunkSize": self.chunk_size,
             "retryChunks": self.retry_chunks,
             "retryChunksLimit": self.retry_chunks_limit,
+            "mergeURL": reverse("dropzone:merge"),
         }
         kwargs.update(_conf)
         return super().get_dropzone_config(**kwargs)
@@ -78,13 +80,21 @@ class DropzoneUploadAbstractView(generic.View):
 
 
 class DropzoneUploadView(DropzoneUploadAbstractView):
-    def get_or_create_session(self, uuid, total_size, total_chunks, chunk_size):
+    def get_or_create_session(
+        self,
+        uuid,
+        total_size,
+        total_chunks,
+        chunk_size,
+        file_name,
+    ):
         session, created = Session.objects.get_or_create(
             uuid=uuid,
             defaults={
                 "total_size": total_size,
                 "total_chunks": total_chunks,
                 "chunk_size": chunk_size,
+                "file_name": file_name,
             },
         )
         return session
@@ -96,5 +106,22 @@ class DropzoneUploadView(DropzoneUploadAbstractView):
         total_size = payload["dztotalfilesize"]
         chunk_size = payload["dzchunksize"]
         total_chunks = payload["dztotalchunkcount"]
-        session = self.get_or_create_session(uuid, total_size, total_chunks, chunk_size)
+        file_name = self.request.FILES[self.file_param].name
+        session = self.get_or_create_session(
+            uuid,
+            total_size,
+            total_chunks,
+            chunk_size,
+            file_name,
+        )
         session.create_chunk(file, index=chunk_index)
+
+
+class DropzoneMergeView(generic.View):
+    def get_or_404(self):
+        return get_object_or_404(Session, uuid=self.request.POST.get("dzuuid", ""))
+
+    def post(self, request, *args, **kwargs):
+        session = self.get_or_404()
+        session.merge_chunks()
+        return JsonResponse({"success": True})
