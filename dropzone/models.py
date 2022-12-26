@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from django.conf import settings
 from django.db import models
 
 from .conf import settings as dz_settings
@@ -7,11 +8,18 @@ from .utils import sizeof_fmt
 
 
 class Session(models.Model):
+    def session_upload_path(self, filename, dir_path=None):
+        if dir_path is None:
+            dir_path = dz_settings.FILE_UPLOAD_SESSION_DIR
+
+        return f"{dir_path}/{self.uuid}--{filename}"
+
     uuid = models.UUIDField(unique=True)
     total_size = models.IntegerField()
     total_chunks = models.IntegerField()
     chunk_size = models.IntegerField()
     file_name = models.CharField(max_length=255)
+    file = models.FileField(upload_to=session_upload_path)
 
     def __str__(self):
         return str(self.uuid)
@@ -35,11 +43,15 @@ class Session(models.Model):
     def is_complete(self):
         return self.chunks.count() == self.total_chunks
 
+    def safe_delete_chunks(self):
+        ...
+
     def merge_chunks(self, **kwargs):
         if not self.is_complete:
             raise ValueError("Chunks are not complete")
 
-        Path(dz_settings.FILE_PROCESSING_DIR).mkdir(
+        dir_path = settings.MEDIA_ROOT / dz_settings.FILE_UPLOAD_SESSION_DIR
+        Path(dir_path).mkdir(
             # create the directory if it doesn't exist
             exist_ok=True,
             parents=True,
@@ -48,11 +60,17 @@ class Session(models.Model):
         # Since we are using the UUID to create the file name, we can be
         # sure that the file name is unique and thus appending to this
         # newly created file will give us the merged file.
-        file_path = dz_settings.FILE_PROCESSING_DIR / f"{self.uuid}-{self.file_name}"
+        file_path = self.session_upload_path(filename=self.file_name, dir_path=dir_path)
         file_stream = open(file_path, "ab")
 
         for chunk in self.chunks.order_by("index"):
             file_stream.write(chunk.file.read())
+        file_stream.close()
+
+        self.file = self.session_upload_path(filename=self.file_name)
+        self.save(update_fields=["file"])
+
+        self.safe_delete_chunks()
 
 
 class ChunkedFile(models.Model):
@@ -60,7 +78,7 @@ class ChunkedFile(models.Model):
 
     def chunk_upload_path(self, filename):
         return (
-            f"{dz_settings.FILE_UPLOAD_DIR}/{self.session.uuid}"
+            f"{dz_settings.FILE_UPLOAD_CHUNKS_DIR}/{self.session.uuid}"
             f"/{self.index}{self.SEP}{filename}"
         )
 

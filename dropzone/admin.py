@@ -26,5 +26,6 @@ class SessionAdmin(admin.ModelAdmin):
         "total_chunks",
         "humanized_chunk_size",
         "is_complete",
+        "file",
     )
-    fields = ("total_chunks",)
+    fields = readonly_fields
