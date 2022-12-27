@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db import models
 
 from .conf import settings as dz_settings
+from .exceptions import DZFileMergeError, DZFileNotFoundError
 from .utils import sizeof_fmt
 
 
@@ -19,7 +20,7 @@ class Session(models.Model):
     total_chunks = models.IntegerField()
     chunk_size = models.IntegerField()
     file_name = models.CharField(max_length=255)
-    file = models.FileField(upload_to=session_upload_path)
+    file = models.FileField(upload_to=session_upload_path, blank=True, null=True)
 
     def __str__(self):
         return str(self.uuid)
@@ -44,11 +45,21 @@ class Session(models.Model):
         return self.chunks.count() == self.total_chunks
 
     def safe_delete_chunks(self):
-        ...
+        if not self.file:
+            msg = (
+                f"Unable to find the merged file associated "
+                f"with this session ({self.uuid})"
+            )
+            raise DZFileNotFoundError(msg)
+
+        for chunk in self.chunks.all():
+            chunk.file.delete()
+            chunk.delete()
 
     def merge_chunks(self, **kwargs):
         if not self.is_complete:
-            raise ValueError("Chunks are not complete")
+            msg = "Unable to merge chunks because the session is not complete"
+            raise DZFileMergeError(msg)
 
         dir_path = settings.MEDIA_ROOT / dz_settings.FILE_UPLOAD_SESSION_DIR
         Path(dir_path).mkdir(
