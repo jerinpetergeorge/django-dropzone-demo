@@ -43,6 +43,8 @@ class Session(TimeStampedModel, models.Model):
 
     @property
     def is_complete(self):
+        if self.file:
+            return True
         return self.chunks.count() == self.total_chunks
 
     def safe_delete_chunks(self):
