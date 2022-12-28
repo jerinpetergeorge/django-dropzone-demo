@@ -1,6 +1,6 @@
-from pathlib import Path
+from tempfile import NamedTemporaryFile
 
-from django.conf import settings
+from django.core.files.storage import default_storage
 from django.db import models
 
 from .conf import settings as dz_settings
@@ -61,26 +61,27 @@ class Session(models.Model):
             msg = "Unable to merge chunks because the session is not complete"
             raise DZFileMergeError(msg)
 
-        dir_path = settings.MEDIA_ROOT / dz_settings.FILE_UPLOAD_SESSION_DIR
-        Path(dir_path).mkdir(
-            # create the directory if it doesn't exist
-            exist_ok=True,
-            parents=True,
-        )
+        # Create a temporary file to merge the chunks into
+        temp_file = NamedTemporaryFile(mode="ab+", delete=True, prefix="dz-temp-")
 
-        # Since we are using the UUID to create the file name, we can be
-        # sure that the file name is unique and thus appending to this
-        # newly created file will give us the merged file.
-        file_path = self.session_upload_path(filename=self.file_name, dir_path=dir_path)
-        file_stream = open(file_path, "ab")
-
+        # Merge the chunks into the temporary file
         for chunk in self.chunks.order_by("index"):
-            file_stream.write(chunk.file.read())
-        file_stream.close()
+            temp_file.write(chunk.file.read())
 
-        self.file = self.session_upload_path(filename=self.file_name)
+        # Set pointer to the beginning of the file
+        temp_file.seek(0)
+
+        # Create a new file in the storage backend
+        file_path = self.session_upload_path(self.file_name)
+        file = default_storage.save(file_path, temp_file)
+
+        self.file = file
         self.save(update_fields=["file"])
 
+        # Delete the temporary file
+        temp_file.close()
+
+        # Delete the chunks
         self.safe_delete_chunks()
 
 
