@@ -2,13 +2,14 @@ from tempfile import NamedTemporaryFile
 
 from django.core.files.storage import default_storage
 from django.db import models
+from django_extensions.db.models import TimeStampedModel
 
 from .conf import settings as dz_settings
 from .exceptions import DZFileMergeError, DZFileNotFoundError
 from .utils import sizeof_fmt
 
 
-class Session(models.Model):
+class Session(TimeStampedModel, models.Model):
     def session_upload_path(self, filename, dir_path=None):
         if dir_path is None:
             dir_path = dz_settings.FILE_UPLOAD_SESSION_DIR
@@ -85,7 +86,7 @@ class Session(models.Model):
         self.safe_delete_chunks()
 
 
-class ChunkedFile(models.Model):
+class ChunkedFile(TimeStampedModel, models.Model):
     SEP = "___"
 
     def chunk_upload_path(self, filename):
