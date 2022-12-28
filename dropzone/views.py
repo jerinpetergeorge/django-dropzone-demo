@@ -1,5 +1,6 @@
 import json
 from functools import cached_property
+from uuid import uuid4
 
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
@@ -70,8 +71,23 @@ class DropzoneRenderView(DropzoneChunkedUploadView):
 class DropzoneUploadAbstractView(generic.View):
     file_param = dz_settings.FILE_FIELD_NAME
 
-    def process_file(self, file, *args, **kwargs):
+    def _process_normal_upload(self, file, *args, **kwargs):
         ...
+
+    def _process_chunked_upload(self, file, *args, **kwargs):
+        ...
+
+    def process_file(self, file, *args, **kwargs):
+        payload = self.request.POST
+        if "dzuuid" not in payload:
+            # When the size of the upload file below the
+            # chunk size, it won't include certain fields.
+            #
+            # So we can assume that it's a normal upload and
+            # need to set it on `Session` model.
+            return self._process_normal_upload(file, *args, **kwargs)
+
+        return self._process_chunked_upload(file, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         file = request.FILES.get(self.file_param)
@@ -80,6 +96,16 @@ class DropzoneUploadAbstractView(generic.View):
 
 
 class DropzoneUploadView(DropzoneUploadAbstractView):
+    def create_session(self, file, *args, **kwargs):
+        return Session.objects.create(
+            file_name=file.name,
+            total_size=file.size,
+            total_chunks=1,
+            chunk_size=file.size,
+            file=file,
+            **kwargs,
+        )
+
     def get_or_create_session(
         self,
         uuid,
@@ -99,7 +125,10 @@ class DropzoneUploadView(DropzoneUploadAbstractView):
         )
         return session
 
-    def process_file(self, file, *args, **kwargs):
+    def _process_normal_upload(self, file, *args, **kwargs):
+        return self.create_session(file, uuid=uuid4())
+
+    def _process_chunked_upload(self, file, *args, **kwargs):
         payload = self.request.POST
         uuid = payload["dzuuid"]
         chunk_index = payload["dzchunkindex"]
